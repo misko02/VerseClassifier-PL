@@ -1,0 +1,38 @@
+[tool.poetry]
+name = "verseclassifier-pl"
+version = "0.1.0"
+description = "Polish rap vs poetry classifier scaffold"
+authors = ["Misko02"]
+readme = "README.md"
+packages = [
+  { include = "verse_classifier_pl" },
+  { include = "scrappers" },
+]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+requests = "^2.32.3"
+beautifulsoup4 = "^4.12.3"
+lyricsgenius = "^3.0.1"
+pandas = "^2.2.2"
+scikit-learn = "^1.5.1"
+spacy = "^3.7.6"
+transformers = "^4.44.2"
+torch = "^2.4.0"
+lime = "^0.2.0.1"
+shap = "^0.46.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.2"
+ruff = "^0.6.2"
+
+[tool.poetry.scripts]
+verse-classifier = "verse_classifier_pl.cli:main"
+
+[build-system]
+requires = ["poetry-core>=1.9.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"

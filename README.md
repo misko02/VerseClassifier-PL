@@ -16,3 +16,13 @@ Ze względu na ochronę praw autorskich twórców współczesnych (zarówno rape
 W repozytorium udostępniono jedynie skrypty pobierające (`scrapers/`), które pozwalają na samodzielne odtworzenie zbioru w celach edukacyjnych i badawczych na własnym komputerze.
 
 ---
+
+## 🧱 Startowa struktura repozytorium
+- `main.py` - lokalny entrypoint do uruchamiania projektu.
+- `verse_classifier_pl/` - właściwy pakiet aplikacji.
+- `scrappers/` - fetchery danych dla rapu i poezji.
+- `tests/` - jednostkowe i integracyjne testy.
+- `.data/` - **prywatne, lokalne zbiory robocze** (`raw`, `interim`, `processed`) – poza publicznym repozytorium ze względu na prawa autorskie.
+- `.artifacts/` - **lokalne wyniki eksperymentów**: checkpointy modeli, metryki, raporty, wykresy – poza repozytorium.
+
+---
