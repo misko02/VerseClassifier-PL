@@ -13,6 +13,10 @@ DEFAULT_POET_SLUGS = (
     "juliusz-slowacki",
     "cyprian-kamil-norwid",
     "jan-kochanowski",
+    "julian-tuwim",
+    "boleslaw-lesmian",
+    "krzysztof-kamil-baczynski",
+    "adam-asnyk"
 )
 
 
@@ -55,7 +59,7 @@ class PoemScraper:
         details = detail_response.json()
 
         text_url = details.get("txt")
-        if not isinstance(text_url, str):
+        if not text_url or not isinstance(text_url, str):
             return None
 
         text_response = self.session.get(text_url, timeout=self.timeout_seconds)
