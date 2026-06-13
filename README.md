@@ -141,8 +141,83 @@ make scrape-poetry POETRY_LIMIT=10
 make scrape-rap RAP_LIMIT=10
 make scrape-all
 make prepare-data
+make train-baseline
+make predict TEXT="tu wpisz własny tekst"
 ```
 
 Szczegóły w `Makefile`.
 
 ---
+
+## 🧠 Pierwszy model: baseline TF-IDF + Logistic Regression
+
+Po utworzeniu `.data/processed/combined.jsonl` możesz wytrenować pierwszy model:
+
+```bash
+make train-baseline
+```
+
+Albo bez Makefile:
+
+```bash
+poetry run python -m verse_classifier_pl train-baseline
+```
+
+Domyślny trening:
+- ładuje `.data/processed/combined.jsonl`
+- dzieli dane na train/validation/test w proporcji `70/15/15`
+- robi split po całych utworach (`source + author + title`), więc chunki z jednego utworu nie przeciekają między zbiorami
+- trenuje `TfidfVectorizer` + `LogisticRegression`
+- zapisuje splity do `.data/processed/splits/`
+- zapisuje model do `.artifacts/baseline/model.joblib`
+- zapisuje metryki do `.artifacts/baseline/metrics.json`
+
+Przykład szybkiego eksperymentu z mniejszą próbką treningową:
+
+```bash
+make train-baseline MAX_TRAIN_SAMPLES_PER_CLASS=1000
+```
+
+Przykład z własnymi ścieżkami:
+
+```bash
+poetry run python -m verse_classifier_pl train-baseline \
+  --dataset .data/processed/combined.jsonl \
+  --model-dir .artifacts/baseline \
+  --split-dir .data/processed/splits \
+  --test-size 0.15 \
+  --val-size 0.15
+```
+
+### Predykcja własnego tekstu
+
+Po wytrenowaniu baseline możesz sprawdzić własny fragment:
+
+```bash
+make predict TEXT="idę przez miasto i liczę światła na mokrym asfalcie"
+```
+
+Albo bez Makefile:
+
+```bash
+poetry run python -m verse_classifier_pl predict \
+  --text "idę przez miasto i liczę światła na mokrym asfalcie"
+```
+
+Tekst z pliku:
+
+```bash
+poetry run python -m verse_classifier_pl predict --file sample.txt
+```
+
+Wynik zawiera klasę oraz prawdopodobieństwa:
+- `poetry` = poezja
+- `rap` = rap
+
+JSON dla skryptów:
+
+```bash
+poetry run python -m verse_classifier_pl predict \
+  --text "noc rozlewa atrament po bruku" \
+  --json
+```
