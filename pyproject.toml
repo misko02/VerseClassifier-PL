@@ -10,7 +10,7 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.10"
+python = "^3.12"
 requests = "^2.32.3"
 beautifulsoup4 = "^4.12.3"
 lyricsgenius = "^3.0.1"
@@ -19,9 +19,13 @@ scikit-learn = "^1.5.1"
 joblib = "^1.4.2"
 spacy = "^3.7.6"
 transformers = "^4.44.2"
-torch = "^2.4.0"
+torch = {version = "2.6.0+cu124", source = "pytorch"}
+accelerate = "^1.9.0"
 lime = "^0.2.0.1"
 shap = "^0.46.0"
+protobuf = "^7.35.1"
+sentencepiece = "^0.2.1"
+sacremoses = "^0.1.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.2"
@@ -40,3 +44,8 @@ target-version = "py310"
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+
+[[tool.poetry.source]]
+name = "pytorch"
+url = "https://download.pytorch.org/whl/cu124"
+priority = "explicit"

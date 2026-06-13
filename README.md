@@ -143,6 +143,8 @@ make scrape-all
 make prepare-data
 make train-baseline
 make predict TEXT="tu wpisz własny tekst"
+make train-transformer-smoke
+make train-transformer
 ```
 
 Szczegóły w `Makefile`.
@@ -220,4 +222,60 @@ JSON dla skryptów:
 poetry run python -m verse_classifier_pl predict \
   --text "noc rozlewa atrament po bruku" \
   --json
+```
+
+---
+
+## 🤖 Model transformerowy: HerBERT
+
+Docelowy model projektu bazuje na HerBERT-cie z Hugging Face:
+`allegro/herbert-base-cased`.
+
+Pierwsze uruchomienie pobierze tokenizer i wagi modelu, więc wymaga dostępu do
+internetu albo wcześniejszego cache Hugging Face.
+
+Szybki smoke-test na małej próbce:
+
+```bash
+make train-transformer-smoke
+```
+
+Pełniejszy trening:
+
+```bash
+make train-transformer
+```
+
+Albo bez Makefile:
+
+```bash
+poetry run python -m verse_classifier_pl train-transformer \
+  --dataset .data/processed/combined.jsonl \
+  --model-dir .artifacts/transformer \
+  --split-dir .data/processed/splits_transformer \
+  --pretrained-model allegro/herbert-base-cased \
+  --epochs 3 \
+  --train-batch-size 8 \
+  --eval-batch-size 16 \
+  --max-length 128
+```
+
+Domyślny trening:
+- używa tych samych 4-linijkowych chunków co baseline
+- dzieli dane po całych utworach (`source + author + title`)
+- zapisuje splity do `.data/processed/splits_transformer/`
+- zapisuje model i tokenizer do `.artifacts/transformer/model/`
+- zapisuje checkpointy do `.artifacts/transformer/checkpoints/`
+- zapisuje metryki do `.artifacts/transformer/metrics.json`
+
+Przy słabszym sprzęcie zacznij od:
+
+```bash
+make train-transformer MAX_TRAIN_SAMPLES_PER_CLASS=500 TRAIN_BATCH_SIZE=4 EPOCHS=1
+```
+
+Jeżeli masz GPU z większą pamięcią, możesz zwiększyć batch:
+
+```bash
+make train-transformer TRAIN_BATCH_SIZE=16 EVAL_BATCH_SIZE=32
 ```

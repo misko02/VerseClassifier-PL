@@ -145,7 +145,64 @@ def build_parser() -> argparse.ArgumentParser:
         default=2,
         help="Maximum word n-gram size for TF-IDF.",
     )
-    subparsers.add_parser("train-transformer", help="Fine-tune HerBERT transformer.")
+    transformer_parser = subparsers.add_parser(
+        "train-transformer",
+        help="Fine-tune HerBERT transformer.",
+    )
+    transformer_parser.add_argument(
+        "--dataset",
+        type=Path,
+        default=PROCESSED_DATA_DIR / "combined.jsonl",
+        help="Processed JSONL dataset produced by prepare-data.",
+    )
+    transformer_parser.add_argument(
+        "--model-dir",
+        type=Path,
+        default=ARTIFACTS_DIR / "transformer",
+        help="Directory for transformer model artifacts.",
+    )
+    transformer_parser.add_argument(
+        "--split-dir",
+        type=Path,
+        default=PROCESSED_DATA_DIR / "splits_transformer",
+        help="Directory for train/val/test split JSONL files.",
+    )
+    transformer_parser.add_argument(
+        "--pretrained-model",
+        type=str,
+        default="allegro/herbert-base-cased",
+        help="Hugging Face model name or local path.",
+    )
+    transformer_parser.add_argument("--epochs", type=float, default=3.0)
+    transformer_parser.add_argument("--learning-rate", type=float, default=2e-5)
+    transformer_parser.add_argument("--train-batch-size", type=int, default=8)
+    transformer_parser.add_argument("--eval-batch-size", type=int, default=16)
+    transformer_parser.add_argument("--max-length", type=int, default=128)
+    transformer_parser.add_argument("--weight-decay", type=float, default=0.01)
+    transformer_parser.add_argument(
+        "--test-size",
+        type=float,
+        default=0.15,
+        help="Fraction of works reserved for test split.",
+    )
+    transformer_parser.add_argument(
+        "--val-size",
+        type=float,
+        default=0.15,
+        help="Fraction of works reserved for validation split.",
+    )
+    transformer_parser.add_argument(
+        "--max-train-samples-per-class",
+        type=int,
+        default=None,
+        help="Optional class-balanced cap for quick transformer experiments.",
+    )
+    transformer_parser.add_argument(
+        "--random-seed",
+        type=int,
+        default=DEFAULT_RANDOM_SEED,
+        help="Random seed used for splits and model training.",
+    )
     predict_parser = subparsers.add_parser(
         "predict",
         help="Classify a custom text with a trained baseline model.",
@@ -155,6 +212,12 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=ARTIFACTS_DIR / "baseline" / "model.joblib",
         help="Path to trained baseline model.joblib.",
+    )
+    predict_parser.add_argument(
+        "--model-type",
+        choices=("baseline", "transformer"),
+        default="baseline",
+        help="Type of the model to use for prediction.",
     )
     input_group = predict_parser.add_mutually_exclusive_group(required=True)
     input_group.add_argument(
@@ -191,6 +254,8 @@ def main(argv: list[str] | None = None) -> int:
         return run_prepare_data(args)
     elif args.command == "train-baseline":
         return run_train_baseline(args)
+    elif args.command == "train-transformer":
+        return run_train_transformer(args)
     elif args.command == "predict":
         return run_predict(args)
 
@@ -356,22 +421,44 @@ def run_train_baseline(args: argparse.Namespace) -> int:
 
 
 def run_predict(args: argparse.Namespace) -> int:
-    """Classify a custom text with a saved baseline model."""
+    """Classify a custom text with a saved model."""
     try:
         from .core.cleaning import clean_lyrics
-        from .modeling.baseline import BaselineTextClassifier
 
         text = args.text if args.text is not None else args.file.read_text(encoding="utf-8")
         cleaned_text = clean_lyrics(text)
         if not cleaned_text:
             raise ValueError("Input text is empty after cleaning.")
 
-        model = BaselineTextClassifier.load(args.model)
-        label = model.predict_texts([cleaned_text])[0]
-        probabilities = model.predict_text_probabilities([cleaned_text])[0]
+        # ZMIENIONY BLOK LOGIKI:
+        if args.model_type == "baseline":
+            from .modeling.baseline import BaselineTextClassifier
+            model = BaselineTextClassifier.load(args.model)
+            label = model.predict_texts([cleaned_text])[0]
+            probabilities = model.predict_text_probabilities([cleaned_text])[0]
+            poetry_probability = probabilities.get(0, 0.0)
+            rap_probability = probabilities.get(1, 0.0)
+
+        elif args.model_type == "transformer":
+                    from .modeling.transformer import TransformerTextClassifier
+                    from .data.schemas import TextChunk
+                    
+                    model = TransformerTextClassifier.load(args.model)
+                    dummy_chunk = TextChunk(
+                        source="predict",
+                        title="custom",
+                        author="custom",
+                        lines=cleaned_text.split("\n"),
+                        label=0,
+                        chunk_index=0
+                    )
+                    
+                    probabilities = model.predict_probabilities([dummy_chunk])[0]
+                    poetry_probability = probabilities.get(0, 0.0)
+                    rap_probability = probabilities.get(1, 0.0)
+                    
+                    label = 1 if rap_probability > poetry_probability else 0
         label_name = _label_name(label)
-        poetry_probability = probabilities.get(0, 0.0)
-        rap_probability = probabilities.get(1, 0.0)
 
         if args.json:
             print(
@@ -401,3 +488,95 @@ def run_predict(args: argparse.Namespace) -> int:
 
 def _label_name(label: int) -> str:
     return "rap" if label == 1 else "poetry"
+
+
+def run_train_transformer(args: argparse.Namespace) -> int:
+    """Fine-tune HerBERT on processed 4-line chunks."""
+    try:
+        from .data.dataset import (
+            class_counts,
+            load_chunks_jsonl,
+            sample_per_class,
+            save_chunks_jsonl,
+            split_chunks_by_work,
+        )
+        from .evaluation.metrics import compute_classification_metrics
+        from .modeling.transformer import TransformerConfig, TransformerTextClassifier
+
+        chunks = load_chunks_jsonl(args.dataset)
+        logger.info(f"Loaded {len(chunks)} chunks from {args.dataset}")
+
+        train_chunks, val_chunks, test_chunks = split_chunks_by_work(
+            chunks,
+            test_size=args.test_size,
+            val_size=args.val_size,
+            random_seed=args.random_seed,
+        )
+        train_chunks = sample_per_class(
+            train_chunks,
+            max_samples_per_class=args.max_train_samples_per_class,
+            random_seed=args.random_seed,
+        )
+
+        args.split_dir.mkdir(parents=True, exist_ok=True)
+        save_chunks_jsonl(train_chunks, args.split_dir / "train.jsonl")
+        save_chunks_jsonl(val_chunks, args.split_dir / "val.jsonl")
+        save_chunks_jsonl(test_chunks, args.split_dir / "test.jsonl")
+
+        logger.info(f"Train chunks: {len(train_chunks)} {class_counts(train_chunks)}")
+        logger.info(f"Val chunks: {len(val_chunks)} {class_counts(val_chunks)}")
+        logger.info(f"Test chunks: {len(test_chunks)} {class_counts(test_chunks)}")
+
+        model = TransformerTextClassifier(
+            TransformerConfig(
+                model_name=args.pretrained_model,
+                max_length=args.max_length,
+                learning_rate=args.learning_rate,
+                epochs=args.epochs,
+                train_batch_size=args.train_batch_size,
+                eval_batch_size=args.eval_batch_size,
+                weight_decay=args.weight_decay,
+                random_seed=args.random_seed,
+            )
+        )
+        val_metrics = model.train(
+            train_samples=train_chunks,
+            val_samples=val_chunks,
+            output_dir=args.model_dir,
+        )
+        test_predictions = model.predict(test_chunks)
+        test_metrics = compute_classification_metrics(
+            [chunk.label for chunk in test_chunks],
+            test_predictions,
+        )
+
+        metrics = {
+            "dataset": str(args.dataset),
+            "model": "herbert_sequence_classification",
+            "pretrained_model": args.pretrained_model,
+            "random_seed": args.random_seed,
+            "train_chunks": len(train_chunks),
+            "val_chunks": len(val_chunks),
+            "test_chunks": len(test_chunks),
+            "train_class_counts": class_counts(train_chunks),
+            "val_class_counts": class_counts(val_chunks),
+            "test_class_counts": class_counts(test_chunks),
+            "validation": val_metrics,
+            "test": test_metrics,
+        }
+        args.model_dir.mkdir(parents=True, exist_ok=True)
+        metrics_path = args.model_dir / "metrics.json"
+        metrics_path.write_text(
+            json.dumps(metrics, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+
+        logger.info(f"Saved transformer model to {args.model_dir / 'model'}")
+        logger.info(f"Saved metrics to {metrics_path}")
+        if "eval_f1" in val_metrics:
+            logger.info(f"Validation F1: {val_metrics['eval_f1']:.4f}")
+        logger.info(f"Test F1: {test_metrics['f1']:.4f}")
+        return 0
+    except Exception as e:
+        logger.error(f"Transformer training failed: {e}")
+        return 1
