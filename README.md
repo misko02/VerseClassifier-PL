@@ -17,7 +17,7 @@ W repozytorium udostępniono jedynie skrypty pobierające (`scrapers/`), które 
 
 ---
 
-## 🧱 Startowa struktura repozytorium
+## Startowa struktura repozytorium
 - `main.py` - lokalny entrypoint do uruchamiania projektu.
 - `verse_classifier_pl/` - właściwy pakiet aplikacji.
 - `scrappers/` - fetchery danych dla rapu i poezji.
@@ -27,7 +27,7 @@ W repozytorium udostępniono jedynie skrypty pobierające (`scrapers/`), które 
 
 ---
 
-## 🕸️ Pipeline: Scrapowanie i postprocessing danych
+## Pipeline: Scrapowanie i postprocessing danych
 
 Pełny workflow tworzenia datasetu:
 
@@ -132,7 +132,7 @@ Każdy wiersz w `combined.jsonl` to JSON-object:
 
 ---
 
-## 🚀 Makefile (opcjonalnie)
+## Makefile (opcjonalnie)
 
 Jeśli masz skonfigurowany `Makefile`, możesz używać skrótów:
 
@@ -151,7 +151,7 @@ Szczegóły w `Makefile`.
 
 ---
 
-## 🧠 Pierwszy model: baseline TF-IDF + Logistic Regression
+## Pierwszy model: baseline TF-IDF + Logistic Regression
 
 Po utworzeniu `.data/processed/combined.jsonl` możesz wytrenować pierwszy model:
 
@@ -226,7 +226,7 @@ poetry run python -m verse_classifier_pl predict \
 
 ---
 
-## 🤖 Model transformerowy: HerBERT
+## Model transformerowy: HerBERT
 
 Docelowy model projektu bazuje na HerBERT-cie z Hugging Face:
 `allegro/herbert-base-cased`.
@@ -278,4 +278,22 @@ Jeżeli masz GPU z większą pamięcią, możesz zwiększyć batch:
 
 ```bash
 make train-transformer TRAIN_BATCH_SIZE=16 EVAL_BATCH_SIZE=32
+```
+
+### Predykcja dla transformera
+
+Gdy posiadasz już wytrenowany model, możesz użyc transformera do skuteczniejszej predykcji:
+
+
+```bash
+make predict-transformer TEXT="idę przez miasto i liczę światła na mokrym asfalcie"
+```
+
+Albo bez Makefile:
+
+```bash
+poetry run python -m verse_classifier_pl predict \
+	--model-type transformer \
+	--model .artifacts/transformer/model \
+	--text "$(TEXT)"
 ```

@@ -76,7 +76,7 @@ train-transformer-smoke:
 	$(MAKE) train-transformer EPOCHS=1 MAX_TRAIN_SAMPLES_PER_CLASS=32 TRAIN_BATCH_SIZE=4 EVAL_BATCH_SIZE=8
 
 predict-transformer:
-	$(PYTHON) -m verse_classifier_pl predict --model $(TRANSFORMER_DIR)/model/model.safetensors --text "$(TEXT)"
+	$(PYTHON) -m verse_classifier_pl predict --model-type transformer --model .artifacts/transformer/model --text "$(TEXT)"
 
 evaluate:
 	$(PYTHON) -m verse_classifier_pl evaluate
