@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-import os
 import json
+import logging
+import os
 import re
 from pathlib import Path
-from typing import List, Optional, Iterable
-import logging
+from typing import Iterable, List, Optional
 
 try:
     import lyricsgenius
@@ -37,7 +37,7 @@ DEFAULT_RAP_ARTISTS = (
     "Bedoes",
     "Sarius",
     "Kali",
-    "Pro8l3m"
+    "Pro8l3m",
 )
 
 
@@ -61,7 +61,9 @@ class RapGeniusScraper:
         if not token:
             raise RuntimeError("Missing Genius token. Set GENIUS_ACCESS_TOKEN in env.")
         if lyricsgenius is None:
-            raise RuntimeError("lyricsgenius package is not installed. Install it before running the scraper.")
+            raise RuntimeError(
+                "lyricsgenius package is not installed. Install it before running the scraper."
+            )
 
         self._client = lyricsgenius.Genius(
             token,
@@ -71,7 +73,6 @@ class RapGeniusScraper:
             skip_non_songs=True,
             excluded_terms=["Remix", "Live", "Demo", "Instrumental"],
         )
-        # quieter output
         self._client.verbose = False
 
     def _ensure_dir(self, path: Path) -> None:
@@ -79,7 +80,6 @@ class RapGeniusScraper:
 
     def _safe_filename(self, *parts: str) -> str:
         name = "_".join(p.strip().replace("/", "_") for p in parts if p)
-        # allow limited charset, shorten
         safe = "".join(c for c in name if c.isalnum() or c in "-_. ")
         return safe.replace(" ", "_")[:200]
 
@@ -95,10 +95,14 @@ class RapGeniusScraper:
         return "\n".join(lines).strip()
 
     def _has_minimum_lines(self, lyrics: str, min_lines: int = 4) -> bool:
-        lines = [ln for ln in (l.strip() for l in lyrics.splitlines()) if ln]
+        lines = [line for line in (raw_line.strip() for raw_line in lyrics.splitlines()) if line]
         return len(lines) >= min_lines
 
-    def scrape(self, save: bool = True, out_dir: Optional[Path] = None) -> List[ScrapedText]:
+    def scrape(
+        self,
+        save: bool = True,
+        out_dir: Optional[Path] = None,
+    ) -> List[ScrapedText]:
         """Scrape configured artists and optionally save raw JSON files locally.
 
         Returns list of ScrapedText objects.
@@ -132,20 +136,35 @@ class RapGeniusScraper:
                 author = getattr(artist, "name", artist_name)
                 url = getattr(song, "url", None)
 
-                scraped = ScrapedText(source=self.source_name, title=title, author=author, text=lyrics)
+                scraped = ScrapedText(
+                    source=self.source_name,
+                    title=title,
+                    author=author,
+                    text=lyrics,
+                    url=url,
+                )
                 samples.append(scraped)
 
                 if save:
                     fname = f"genius_{self._safe_filename(author, title)}.json"
                     path = out_dir / fname
-                    payload = {"title": title, "author": author, "url": url, "lyrics": lyrics}
+                    payload = {
+                        "title": title,
+                        "author": author,
+                        "url": url,
+                        "lyrics": lyrics,
+                    }
                     with open(path, "w", encoding="utf-8") as fh:
                         json.dump(payload, fh, ensure_ascii=False, indent=2)
 
         return samples
 
-    # convenience: scrape specific song ids
-    def scrape_song_ids(self, song_ids: Iterable[int], save: bool = True, out_dir: Optional[Path] = None) -> List[ScrapedText]:
+    def scrape_song_ids(
+        self,
+        song_ids: Iterable[int],
+        save: bool = True,
+        out_dir: Optional[Path] = None,
+    ) -> List[ScrapedText]:
         if out_dir is None:
             out_dir = Path(RAW_DATA_DIR)
         out_dir = Path(out_dir)
@@ -163,12 +182,23 @@ class RapGeniusScraper:
             lyrics = self._clean_genius_lyrics(lyrics)
             if not lyrics or not self._has_minimum_lines(lyrics):
                 continue
-            scraped = ScrapedText(source=self.source_name, title=title, author=artist, text=lyrics)
+            scraped = ScrapedText(
+                source=self.source_name,
+                title=title,
+                author=artist,
+                text=lyrics,
+                url=song.get("url"),
+            )
             samples.append(scraped)
             if save:
                 fname = f"genius_{sid}_{self._safe_filename(artist, title)}.json"
                 path = out_dir / fname
-                payload = {"title": title, "author": artist, "url": song.get("url"), "lyrics": lyrics}
+                payload = {
+                    "title": title,
+                    "author": artist,
+                    "url": song.get("url"),
+                    "lyrics": lyrics,
+                }
                 with open(path, "w", encoding="utf-8") as fh:
                     json.dump(payload, fh, ensure_ascii=False, indent=2)
 

@@ -27,77 +27,122 @@ W repozytorium udostępniono jedynie skrypty pobierające (`scrapers/`), które 
 
 ---
 
-## 🕸️ Uruchamianie scraperów
-Scrapery zapisują dane wyłącznie lokalnie do `.data/raw/`, które jest ignorowane przez Git. Format wyjściowy to JSONL: jeden utwór na linię z polami `source`, `title`, `author`, `text`, `url`.
+## 🕸️ Pipeline: Scrapowanie i postprocessing danych
 
-### Instalacja zależności
+Pełny workflow tworzenia datasetu:
+
+### 1. Instalacja zależności
+
 ```bash
 poetry install
 ```
 
-Jeżeli pracujesz bez Poetry, możesz wskazać własny interpreter w Makefile:
+### 2. Scrapowanie surowych danych
+
+Dane są zapisywane wyłącznie lokalnie w `.data/raw/` (ignorowane przez Git). Format wyjściowy: JSONL (jeden utwór na linię).
+
+#### Poeta: Wolne Lektury
+
+Domyślnie pobierani są wybrani autorzy klasyczni i współcześni z publicznego API Wolnych Lektur.
+
 ```bash
-make scrape-poetry PYTHON=.venv/bin/python
+poetry run python -m verse_classifier_pl scrape poetry
 ```
 
-### Poezja: Wolne Lektury
-Domyślnie pobierani są wybrani autorzy klasyczni z publicznego API Wolnych Lektur.
-
+Z własnym limitem:
 ```bash
-make scrape-poetry
+poetry run python -m verse_classifier_pl scrape poetry --limit-per-author 10
 ```
 
-Wariant z mniejszym limitem:
-```bash
-make scrape-poetry POETRY_LIMIT=5
-```
-
-Bez Makefile:
-```bash
-poetry run python -m verse_classifier_pl scrape poetry --limit-per-author 5
-```
-
-Możesz też podać konkretne slug-i autorów:
+Z konkretnym autorem:
 ```bash
 poetry run python -m verse_classifier_pl scrape poetry \
   --poet adam-mickiewicz \
   --poet juliusz-slowacki \
-  --limit-per-author 10
+  --limit-per-author 15
 ```
 
-Wynik: `.data/raw/poetry.jsonl`.
+Wynik: `.data/raw/` (pliki `wolne_*.json`).
 
-### Rap: Genius
-Scraper rapu używa pakietu `lyricsgenius` i wymaga tokena API Genius:
+#### Rap: Genius API
+
+Wymaga tokena API Genius (zdobądź na https://genius.com/api-clients):
 
 ```bash
 export GENIUS_ACCESS_TOKEN="tu_wklej_token"
-make scrape-rap
+poetry run python -m verse_classifier_pl scrape rap
 ```
 
-Wariant z własnymi artystami:
+Z własnymi artystami:
 ```bash
 poetry run python -m verse_classifier_pl scrape rap \
   --artist "Taco Hemingway" \
   --artist "Łona" \
-  --limit-per-artist 10
+  --limit-per-artist 15
 ```
 
-Wynik: `.data/raw/rap_genius.jsonl`.
+Wynik: `.data/raw/` (pliki `genius_*.json`).
 
-### Wszystkie źródła
+#### Wszystkie źródła
+
 ```bash
 export GENIUS_ACCESS_TOKEN="tu_wklej_token"
-make scrape-all POETRY_LIMIT=10 RAP_LIMIT=10
+poetry run python -m verse_classifier_pl scrape all --limit-per-author 10 --limit-per-artist 10
 ```
 
-Pozostałe pomocnicze komendy:
+### 3. Postprocessing: czyszczenie i chunking
+
+Po scrapowaniu wykonaj postprocessing:
+
 ```bash
-make help
-make lint
-make test
-make prepare-data
-make train-baseline
-make train-transformer
-make evaluate
+poetry run python -m verse_classifier_pl prepare-data
 ```
+
+Opcjonalnie z własnymi ścieżkami:
+```bash
+poetry run python -m verse_classifier_pl prepare-data \
+  --raw-dir .data/raw \
+  --output-dir .data/processed \
+  --output-file dataset.jsonl
+```
+
+**Co się dzieje:**
+- Ładuje wszystkie pliki JSON z `.data/raw/`
+- Czyści teksty: usuwa URL-e, didaskalia `[...]`
+- Dzieli na 4-linijkowe chunki (zgodnie z wymogiem projektu)
+- Etykietuje: `0=poetry`, `1=rap`
+- Zapisuje do JSONL w `.data/processed/`
+
+**Wynik:** `.data/processed/combined.jsonl` — dataset gotowy do treningu.
+
+### 4. Struktura wyjściowego datasetu
+
+Każdy wiersz w `combined.jsonl` to JSON-object:
+```json
+{
+  "source": "rap_genius" | "poetry",
+  "label": 0 | 1,
+  "title": "Tytuł utworu",
+  "author": "Autor",
+  "chunk_index": 0,
+  "lines": ["linia 1", "linia 2", "linia 3", "linia 4"],
+  "text": "linia 1\nlinia 2\nlinia 3\nlinia 4"
+}
+```
+
+---
+
+## 🚀 Makefile (opcjonalnie)
+
+Jeśli masz skonfigurowany `Makefile`, możesz używać skrótów:
+
+```bash
+make scrape-poetry POETRY_LIMIT=10
+make scrape-rap RAP_LIMIT=10
+make scrape-all
+make prepare-data
+```
+
+Szczegóły w `Makefile`.
+
+---
