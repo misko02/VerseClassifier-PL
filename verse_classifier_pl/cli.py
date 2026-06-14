@@ -4,7 +4,6 @@ import argparse
 import json
 import logging
 from pathlib import Path
-
 from .config import ARTIFACTS_DIR, DEFAULT_RANDOM_SEED
 from .data.paths import RAW_DATA_DIR, PROCESSED_DATA_DIR
 from scrappers.base import write_jsonl
@@ -23,7 +22,7 @@ def build_parser() -> argparse.ArgumentParser:
     scrape_parser = subparsers.add_parser("scrape", help="Fetch raw texts locally.")
     scrape_parser.add_argument(
         "source",
-        choices=("poetry", "rap", "all"),
+        choices=("poetry", "rap", "herbert", "modern", "all"),
         help="Data source to fetch.",
     )
     scrape_parser.add_argument(
@@ -56,7 +55,18 @@ def build_parser() -> argparse.ArgumentParser:
         dest="artists",
         help="Genius artist name. Repeat to add multiple.",
     )
-
+    scrape_parser.add_argument(
+        "--limit-herbert",
+        type=int,
+        default=30,
+        help="Maximum poems fetched from Herbert Foundation.",
+    )
+    scrape_parser.add_argument(
+        "--limit-modern",
+        type=int,
+        default=15,
+        help="Maximum poems fetched per modern author from poezja.org.",
+    )
     # Prepare-data subcommand
     prepare_parser = subparsers.add_parser(
         "prepare-data",
@@ -305,7 +315,38 @@ def run_scrape(args: argparse.Namespace) -> int:
         except Exception as e:
             logger.error(f"Rap scraper failed: {e}")
             return 1
+        
+    if args.source in {"herbert", "all"}:
+        try:
+            from scrappers.herbert_scrapper import HerbertScraper
+            logger.info("Scraping Zbigniew Herbert poetry...")
+            scraper = HerbertScraper(limit=args.limit_herbert)
+            samples = scraper.scrape()
+            
+            output_path = output_dir / "poetry.jsonl"
+            write_jsonl(samples, output_path, append=True)
+            
+            logger.info(f"Scraped {len(samples)} Herbert poetry texts")
+            logger.info(f"Appended Herbert poetry to {output_path}")
+        except Exception as e:
+            logger.error(f"Herbert poetry scraper failed: {e}")
+            return 1
+    if args.source in {"modern", "all"}:
+        try:
+            from scrappers.modern_scrapper import ModernPoetryScraper
 
+            logger.info("Scraping modern poetry (poezja.org)...")
+            scraper = ModernPoetryScraper(limit_per_author=args.limit_modern)
+            samples = scraper.scrape()
+            
+            output_path = output_dir / "poetry.jsonl"
+            write_jsonl(samples, output_path, append=True)
+            
+            logger.info(f"Scraped {len(samples)} modern poetry texts")
+            logger.info(f"Appended modern poetry to {output_path}")
+        except Exception as e:
+            logger.error(f"Modern poetry scraper failed: {e}")
+            return 1
     logger.info(f"Raw data saved to {output_dir}")
     return 0
 
@@ -430,7 +471,6 @@ def run_predict(args: argparse.Namespace) -> int:
         if not cleaned_text:
             raise ValueError("Input text is empty after cleaning.")
 
-        # ZMIENIONY BLOK LOGIKI:
         if args.model_type == "baseline":
             from .modeling.baseline import BaselineTextClassifier
             model = BaselineTextClassifier.load(args.model)

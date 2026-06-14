@@ -3,6 +3,8 @@
 PYTHON ?= poetry run python
 POETRY_LIMIT ?= 20
 RAP_LIMIT ?= 20
+HERBERT_LIMIT ?= 30
+MODERN_LIMIT ?= 15
 OUTPUT_DIR ?= .data/raw
 DATASET ?= .data/processed/combined.jsonl
 BASELINE_DIR ?= .artifacts/baseline
@@ -27,6 +29,8 @@ help:
 	@printf "  make lint               Run Ruff checks\n"
 	@printf "  make test               Run pytest\n"
 	@printf "  make scrape-poetry      Fetch poems from Wolne Lektury into .data/raw/poetry.jsonl\n"
+	@printf "  make scrape-herbert     Fetch Herbert's poems from fundacjaherberta.com into .data/raw/herbert_poetry.jsonl\n"
+	@printf "  make scrape-modern      Fetch poems from modern authors on poezja.org into .data/raw/modern_poetry.jsonl\n"
 	@printf "  make scrape-rap         Fetch rap lyrics from Genius into .data/raw/rap_genius.jsonl\n"
 	@printf "  make scrape-all         Fetch both poetry and rap raw datasets\n"
 	@printf "  make prepare-data       Build .data/processed/combined.jsonl\n"
@@ -57,9 +61,14 @@ scrape-poetry:
 scrape-rap:
 	$(PYTHON) -m verse_classifier_pl scrape rap --limit-per-artist $(RAP_LIMIT) --output-dir $(OUTPUT_DIR)
 
-scrape-all:
-	$(PYTHON) -m verse_classifier_pl scrape all --limit-per-author $(POETRY_LIMIT) --limit-per-artist $(RAP_LIMIT) --output-dir $(OUTPUT_DIR)
+scrape-herbert:
+	$(PYTHON) -m verse_classifier_pl scrape herbert --limit-herbert $(HERBERT_LIMIT) --output-dir $(OUTPUT_DIR)
 
+scrape-modern:
+	$(PYTHON) -m verse_classifier_pl scrape modern --limit-modern $(MODERN_LIMIT) --output-dir $(OUTPUT_DIR)
+
+scrape-all:
+	$(PYTHON) -m verse_classifier_pl scrape all --limit-per-author $(POETRY_LIMIT) --limit-per-artist $(RAP_LIMIT) --limit-herbert $(HERBERT_LIMIT) --limit-modern $(MODERN_LIMIT) --output-dir $(OUTPUT_DIR)
 prepare-data:
 	$(PYTHON) -m verse_classifier_pl prepare-data
 

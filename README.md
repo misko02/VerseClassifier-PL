@@ -62,7 +62,21 @@ poetry run python -m verse_classifier_pl scrape poetry \
   --limit-per-author 15
 ```
 
-Wynik: `.data/raw/` (pliki `wolne_*.json`).
+Wynik: `.data/raw/` (pliki `poetry.jsonl`).
+
+#### Poezja Zbigniewa Herberta (Fundacja Herberta)
+
+Rozszerza zbiór o wiersze Zbigniewa Herberta, wprowadzając do modelu przykłady współczesnej poezji i wiersza białego.
+
+```bash
+make scrape-herbert
+
+#### Poezja współczesna i wyklęta (poezja.org)
+
+Pobiera utwory gigantów polskiej poezji współczesnej (Szymborska, Miłosz, Różewicz) oraz tzw. "poetów wyklętych" (Bursa, Wojaczek). Wprowadza do modelu wiersz biały oraz słownictwo wulgarne/turpistyczne, co zapobiega zjawisku Shortcut Learningu (gdzie model każdy wulgaryzm przypisuje domyślnie do klasy "rap").
+
+```bash
+make scrape-modern
 
 #### Rap: Genius API
 
@@ -81,7 +95,8 @@ poetry run python -m verse_classifier_pl scrape rap \
   --limit-per-artist 15
 ```
 
-Wynik: `.data/raw/` (pliki `genius_*.json`).
+Wynik: `.data/raw/` (pliki `rap_genius.jsonl`).
+
 
 #### Wszystkie źródła
 
