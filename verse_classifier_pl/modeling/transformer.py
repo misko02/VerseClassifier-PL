@@ -147,7 +147,7 @@ class TransformerTextClassifier:
             args=training_args,
             train_dataset=train_dataset,
             eval_dataset=val_dataset if len(val_dataset) else None,
-            tokenizer=self.tokenizer,
+            processing_class=self.tokenizer,
             data_collator=DataCollatorWithPadding(tokenizer=self.tokenizer),
             compute_metrics=_compute_trainer_metrics,
         )

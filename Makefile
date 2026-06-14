@@ -1,10 +1,10 @@
 .PHONY: help install lint test scrape-poetry scrape-rap scrape-all prepare-data train-baseline predict train-transformer train-transformer-smoke evaluate
 
 PYTHON ?= poetry run python
+RAP_LIMIT ?= 15
 POETRY_LIMIT ?= 20
-RAP_LIMIT ?= 20
 HERBERT_LIMIT ?= 30
-MODERN_LIMIT ?= 15
+MODERN_LIMIT ?= 20
 OUTPUT_DIR ?= .data/raw
 DATASET ?= .data/processed/combined.jsonl
 BASELINE_DIR ?= .artifacts/baseline
@@ -13,10 +13,12 @@ SPLIT_DIR ?= .data/processed/splits
 TRANSFORMER_SPLIT_DIR ?= .data/processed/splits_transformer
 TEST_SIZE ?= 0.15
 VAL_SIZE ?= 0.15
-MAX_TRAIN_SAMPLES_PER_CLASS ?=
+MAX_TRAIN_SAMPLES_PER_CLASS ?= 1500
 TEXT ?=
+FILE ?=
 MODEL ?= .artifacts/baseline/model.joblib
 PRETRAINED_MODEL ?= allegro/herbert-base-cased
+TRANSFORMER_MODEL ?= .artifacts/transformer/model
 EPOCHS ?= 3
 TRAIN_BATCH_SIZE ?= 8
 EVAL_BATCH_SIZE ?= 16
@@ -39,11 +41,11 @@ help:
 	@printf "  make train-transformer  Fine-tune HerBERT transformer\n"
 	@printf "  make train-transformer-smoke  Run a tiny transformer training smoke-test\n"
 	@printf "\nConfig variables:\n"
-	@printf "  POETRY_LIMIT=20 RAP_LIMIT=20 OUTPUT_DIR=.data/raw\n"
+	@printf "  POETRY_LIMIT=20 RAP_LIMIT=15 OUTPUT_DIR=.data/raw\n"
 	@printf "  DATASET=.data/processed/combined.jsonl BASELINE_DIR=.artifacts/baseline\n"
 	@printf "  MODEL=.artifacts/baseline/model.joblib TEXT='custom text'\n"
 	@printf "  PRETRAINED_MODEL=allegro/herbert-base-cased TRANSFORMER_DIR=.artifacts/transformer\n"
-	@printf "  TEST_SIZE=0.15 VAL_SIZE=0.15 MAX_TRAIN_SAMPLES_PER_CLASS=\n"
+	@printf "  TEST_SIZE=0.15 VAL_SIZE=0.15 MAX_TRAIN_SAMPLES_PER_CLASS=1500\n"
 	@printf "  GENIUS_ACCESS_TOKEN is required for rap scraping\n"
 
 install:
@@ -85,7 +87,7 @@ train-transformer-smoke:
 	$(MAKE) train-transformer EPOCHS=1 MAX_TRAIN_SAMPLES_PER_CLASS=32 TRAIN_BATCH_SIZE=4 EVAL_BATCH_SIZE=8
 
 predict-transformer:
-	$(PYTHON) -m verse_classifier_pl predict --model-type transformer --model .artifacts/transformer/model --text "$(TEXT)"
+	$(PYTHON) -m verse_classifier_pl predict --model-type transformer --model $(TRANSFORMER_MODEL) $(if $(TEXT),--text "$(TEXT)",) $(if $(FILE),--file $(FILE),)
 
 evaluate:
 	$(PYTHON) -m verse_classifier_pl evaluate

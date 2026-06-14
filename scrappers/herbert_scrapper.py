@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 import random
 from dataclasses import dataclass, field
-from typing import Any
 
 import requests
 from bs4 import BeautifulSoup

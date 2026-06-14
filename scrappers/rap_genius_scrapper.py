@@ -36,7 +36,8 @@ DEFAULT_RAP_ARTISTS = (
     "Malik Montana",
     "Bedoes",
     "Sarius",
-    "Kali",
+    "Chada",
+    "Hemp Gru",
     "Pro8l3m",
 )
 
@@ -51,7 +52,7 @@ class RapGeniusScraper:
 
     source_name: str = "rap_genius"
     artists: tuple[str, ...] = DEFAULT_RAP_ARTISTS
-    limit_per_artist: int = 20
+    limit_per_artist: int = 15
     access_token: Optional[str] = None
     timeout_seconds: int = 30
     _client: object = field(default=None, init=False)

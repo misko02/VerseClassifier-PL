@@ -21,12 +21,11 @@ DEFAULT_MODERN_AUTHORS = (
 
 @dataclass(slots=True)
 class ModernPoetryScraper:
-    """Scraper dla poezji współczesnej z portalu poezja.org (w tym poeci wyklęci)"""
     """Scraper for modern poetry from poezja.org"""
     
     source_name: str = "poetry"
     author_slugs: tuple[str, ...] = DEFAULT_MODERN_AUTHORS
-    limit_per_author: int = 15
+    limit_per_author: int = 20
     timeout_seconds: int = 10
     session: requests.Session = field(default_factory=requests.Session)
     
@@ -72,7 +71,8 @@ class ModernPoetryScraper:
         for a_tag in soup.find_all('a', href=True):
             href = a_tag['href']
             if href.startswith(author_url) and len(href) > len(author_url) + 2:
-                links.add(href)
+                if '#' not in href and 'biografia' not in href.lower():
+                    links.add(href)
                 
         links_list = list(links)
         random.shuffle(links_list)
@@ -85,28 +85,46 @@ class ModernPoetryScraper:
         
         soup = BeautifulSoup(response.text, "html.parser")
         
-        title_tag = soup.find('h1')
+        title_tag = soup.find('h1', itemprop='name') or soup.find('h1')
         title = title_tag.get_text(strip=True) if title_tag else url.split('/')[-1].replace('_', ' ')
         
-        content_div = soup.find('div', class_=lambda c: c and ('content' in c.lower() or 'text' in c.lower() or 'poem' in c.lower()))
-        if not content_div:
-            content_div = soup.find('article')
+        content_div = soup.find('div', itemprop='text')
             
         if not content_div:
+            logger.warning(f"Nie znaleziono tekstu wiersza (itemprop='text') pod adresem: {url}")
             return None
             
+        for iframe in content_div.find_all('iframe'):
+            iframe.decompose()
+        for script in content_div.find_all('script'):
+            script.decompose()
         for a in content_div.find_all('a'):
             a.decompose()
             
-        poem_lines = []
         text = content_div.get_text(separator="\n").strip()
         
+        poem_lines = []
         for line in text.split('\n'):
             cleaned_line = line.strip()
-            if cleaned_line and "Czytaj dalej" not in cleaned_line and "Spis treści" not in cleaned_line:
-                poem_lines.append(cleaned_line)
+            
+            if "Od Edytora:" in cleaned_line or "Czytaj dalej:" in cleaned_line or "Spis treści" in cleaned_line:
+                continue
                 
-        full_text = "\n".join(poem_lines)
+            poem_lines.append(cleaned_line)
+                
+        valid_lines = [l for l in poem_lines if l]
+        if not valid_lines:
+            return None
+            
+        long_lines = sum(1 for line in valid_lines if len(line) > 80)
+        if (long_lines / len(valid_lines)) > 0.5:
+            logger.warning(f"Odrzucono prozę/biografię pod adresem: {url}")
+            return None
+                
+        import re
+        full_text = "\n".join(poem_lines).strip()
+        full_text = re.sub(r'\n{3,}', '\n\n', full_text)
+        
         if not full_text:
             return None
             
